@@ -34,7 +34,7 @@ switch ($request_method) {
     case 'PUT':
         authenticate_user();
 
-        if (isset($_GET['user']) && isset($_GET['userId'])) {
+        if (isset($_GET['user']) && isset($_GET['userID'])) {
             handle_update_user($_GET['userId']);
         } else {
             http_response_code(400);
@@ -60,26 +60,48 @@ switch ($request_method) {
 
 function handle_login() {
     global $conn;
-
     $data = json_decode(file_get_contents("php://input"), true);
 
     $username = $data['username'];
     $password = $data['password'];
 
-    $sql = "SELECT * FROM users WHERE username = '$username' AND password = '$password'";
-    $result = $conn->query($sql);
+    // Fetch the user from the database based on the username
+    $sql = "SELECT * FROM USER WHERE Username = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("s", $username);
+    $stmt->execute();
+    $result = $stmt->get_result();
 
-    if ($result->num_rows == 1) {
-        $row = $result->fetch_assoc();
-        $_SESSION['user_id'] = $row['id'];
-        $_SESSION['role'] = $row['role'];
-        $token = session_id();
-        echo json_encode(["token" => $token]);
+    if ($result) {
+        if ($result->num_rows == 1) {
+            $row = $result->fetch_assoc();
+
+            // Verify the password using bcrypt
+            if (md5($password) === $row['Password']) {
+                // Password is correct (MD5 hash)
+                $_SESSION['user_id'] = $row['UserID'];
+                $_SESSION['role'] = $row['RoleID'];
+
+                $token = session_id();
+                echo json_encode(["token" => $token]);
+            } else {
+                // Password is incorrect
+                http_response_code(401); // Unauthorized
+                echo json_encode(["error" => "Password is incorrect"]);
+            }
+        } else {
+            // User not found
+            http_response_code(401); // Unauthorized
+            echo json_encode(["error" => "User not found"]);
+        }
     } else {
-        http_response_code(401); // Unauthorized
-        echo json_encode(["error" => "Invalid credentials"]);
+        http_response_code(500); // Internal Server Error
+        echo json_encode(["error" => "Error querying the database"]);
     }
+    $stmt->close();
 }
+
+
 
 function authenticate_user() {
     if (!isset($_SESSION['user_id'])) {

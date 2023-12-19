@@ -40,11 +40,10 @@
         };
 
         // Make a POST request to the login endpoint
-        fetch('./auth/api.php/login', {
+        fetch('./auth/api.php', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
-                // Add any additional headers if needed
             },
             body: JSON.stringify(data)
         })
